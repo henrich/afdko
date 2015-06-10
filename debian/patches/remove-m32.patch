@@ -1,0 +1,100 @@
+Description: Remove -m32
+--- afdko-63209.orig/FDK/Tools/Programs/public/config/linux/gcc/gcc.mak
++++ afdko-63209/FDK/Tools/Programs/public/config/linux/gcc/gcc.mak
+@@ -14,7 +14,7 @@ PLATFORM = linux
+ HARDWARE = i86
+ COMPILER = gcc
+ SYS_LIBS = -lm
+-XFLAGS = -m32
++XFLAGS = 
+ 
+ # Directories (relative to build directory)
+ CT_LIB_DIR = $(ROOT_DIR)/../public/lib/lib/$(PLATFORM)/$(CONFIG)
+--- afdko-63209.orig/FDK/Tools/Programs/public/lib/config/linux/gcc/gcc.mak
++++ afdko-63209/FDK/Tools/Programs/public/lib/config/linux/gcc/gcc.mak
+@@ -13,7 +13,7 @@
+ PLATFORM = linux
+ HARDWARE = i86
+ COMPILER = gcc
+-XFLAGS = -m32
++XFLAGS = 
+ # Directories (relative to build directory)
+ LIB_DIR = $(ROOT_DIR)/lib/$(PLATFORM)/$(CONFIG)
+ 
+--- afdko-63209.orig/FDK/Tools/Programs/public/lib/config/linux/gcc/gcc_tx.mak
++++ afdko-63209/FDK/Tools/Programs/public/lib/config/linux/gcc/gcc_tx.mak
+@@ -13,7 +13,7 @@
+ PLATFORM = linux
+ HARDWARE = i86
+ COMPILER = gcc
+-XFLAGS = -m32
++XFLAGS = 
+ 
+ # Directories (relative to build directory)
+ LIB_DIR = $(ROOT_DIR)/lib/$(PLATFORM)/$(CONFIG)
+--- afdko-63209.orig/FDK/Tools/Programs/sfntdiff/build/linux/gcc/debug/Makefile
++++ afdko-63209/FDK/Tools/Programs/sfntdiff/build/linux/gcc/debug/Makefile
+@@ -24,7 +24,7 @@ CONFIG = debug
+ ROOT_DIR = ../../../..
+ OBJECT_DIR = .
+ 
+-CFLAGS = $(STD_OPTS) -m32 -g -I$(ROOT_DIR)/../spot/sfnt_includes
++CFLAGS = $(STD_OPTS)  -g -I$(ROOT_DIR)/../spot/sfnt_includes
+ 
+ # Program
+ PRG_SRCS = $(SRC_DIR)/Dmain.c \
+--- afdko-63209.orig/FDK/Tools/Programs/sfntdiff/build/linux/gcc/release/Makefile
++++ afdko-63209/FDK/Tools/Programs/sfntdiff/build/linux/gcc/release/Makefile
+@@ -24,7 +24,7 @@ CONFIG = release
+ ROOT_DIR = ../../../..
+ OBJECT_DIR = .
+ 
+-CFLAGS = $(STD_OPTS) -m32 -I$(ROOT_DIR)/../spot/sfnt_includes
++CFLAGS = $(STD_OPTS)  -I$(ROOT_DIR)/../spot/sfnt_includes
+ 
+ # Program
+ PRG_SRCS = $(SRC_DIR)/Dmain.c \
+--- afdko-63209.orig/FDK/Tools/Programs/sfntedit/build/linux/gcc/debug/Makefile
++++ afdko-63209/FDK/Tools/Programs/sfntedit/build/linux/gcc/debug/Makefile
+@@ -24,7 +24,7 @@ CONFIG = debug
+ ROOT_DIR = ../../../..
+ OBJECT_DIR = .
+ 
+-CFLAGS = $(STD_OPTS) -m32  -g -I$(ROOT_DIR)/../spot/sfnt_includes
++CFLAGS = $(STD_OPTS)   -g -I$(ROOT_DIR)/../spot/sfnt_includes
+ 
+ # Program
+ PRG_SRCS = $(SRC_DIR)/Eda.c \
+--- afdko-63209.orig/FDK/Tools/Programs/sfntedit/build/linux/gcc/release/Makefile
++++ afdko-63209/FDK/Tools/Programs/sfntedit/build/linux/gcc/release/Makefile
+@@ -24,7 +24,7 @@ CONFIG = release
+ ROOT_DIR = ../../../..
+ OBJECT_DIR = .
+ 
+-CFLAGS = $(STD_OPTS) -m32 -I$(ROOT_DIR)/../spot/sfnt_includes
++CFLAGS = $(STD_OPTS)  -I$(ROOT_DIR)/../spot/sfnt_includes
+ 
+ # Program
+ PRG_SRCS = $(SRC_DIR)/Eda.c \
+--- afdko-63209.orig/FDK/Tools/Programs/spot/build/linux/gcc/debug/Makefile
++++ afdko-63209/FDK/Tools/Programs/spot/build/linux/gcc/debug/Makefile
+@@ -13,7 +13,7 @@ PRG_TARGET = $(EXE_DIR)/spot
+ # Build targets
+ TARGETS = $(PRG_TARGET)
+ 
+-CFLAGS = $(STD_OPTS) -m32 -g -I$(ROOT_DIR)/sfnt_includes -I$(SRC_DIR) -DEXECUTABLE=1 -g
++CFLAGS = $(STD_OPTS)  -g -I$(ROOT_DIR)/sfnt_includes -I$(SRC_DIR) -DEXECUTABLE=1 -g
+ 
+ # Program
+ PRG_SRCS = $(SRC_DIR)/BASE.c \
+--- afdko-63209.orig/FDK/Tools/Programs/spot/build/linux/gcc/release/Makefile
++++ afdko-63209/FDK/Tools/Programs/spot/build/linux/gcc/release/Makefile
+@@ -13,7 +13,7 @@ PRG_TARGET = $(EXE_DIR)/spot
+ # Build targets
+ TARGETS = $(PRG_TARGET)
+ 
+-CFLAGS = $(STD_OPTS) -m32 -g -I$(ROOT_DIR)/sfnt_includes -I$(SRC_DIR) -DEXECUTABLE=1
++CFLAGS = $(STD_OPTS)  -g -I$(ROOT_DIR)/sfnt_includes -I$(SRC_DIR) -DEXECUTABLE=1
+ 
+ # Program
+ PRG_SRCS = $(SRC_DIR)/BASE.c \
