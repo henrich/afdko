@@ -6,7 +6,7 @@ default values, and can read values in from a text project file. It will also
 use the tx program to convert the input font file to a Type 1 font, if needed.
 """
 
-__copyright__ = """Copyright 2014 Adobe Systems Incorporated (http://www.adobe.com/). All Rights Reserved.
+__copyright__ = """Copyright 2015 Adobe Systems Incorporated (http://www.adobe.com/). All Rights Reserved.
 """
 
 
@@ -41,7 +41,7 @@ Project file.
 """
 
 __usage__ = """
-makeotf v2.0.79 Sept 8 2014
+makeotf v2.0.82 Juane 1 2015
 -f <input font>         Specify input font path. Default is 'font.pfa'.
 -o <output font>        Specify output font path. Default is
                         '<PostScript-Name>.otf'.
@@ -197,9 +197,13 @@ makeotf v2.0.79 Sept 8 2014
 -ncn                    Turn off converting the CFF table to a CID-keyed
                         CFF that specifies the Adobe-Identity-0 ROS;
                         otherwise has no effect.
-
--shw/-nshw              do/do not suppress warnings about unhinted glyphs.
+-shw/-nshw              Do/Do Not suppress warnings about unhinted glyphs.
 						This is useful when processing unhinted fonts.
+-stubCmap4              Build only a "stub" Format 4 'cmap' subtable, with
+                        only two segments. This is useful only for special-
+                        purpose fonts such as AdobeBlank, whose size is an
+                        issue. Windows requires a Format 4 'cmap' subtable
+                        to be present, but it is not used.
 						
 Note that options are applied in the order in which they are
 specified: "-r -nS" will not subroutinize a font, but "-nS -r" will
@@ -279,6 +283,7 @@ kSerif = "AddedGlyphsAreSerif"  # if true, any added glyphs will be serif. Else,
 kXUID = "XUID" # Integer. Sets the XUID value in the font. Default is to provide no XUID value.
 kConvertToCID = "ConvertToCID"     # Boolean: turns on converting name-keyed font to CID with and identity CMAP.
 kSuppressHintWarnings = "SuppressHintWarnings"
+kStubCmap4 = "StubCmap4"
 
 # Required project file field names for CID-keyed fonts
 kMacScript = "MacCmapScriptID" # Integer. Used to override the heuristics used to determine the script id for the cmap table Mac encoding sub-table.
@@ -336,6 +341,8 @@ kMOTFOptions = {
 	kWriteWrongBacktrack: [kOptionNotSeen, "-fc", None],
 	kConvertToCID: [kOptionNotSeen, "-cn", "-ncn"],
 	kSuppressHintWarnings:  [kOptionNotSeen, "-shw", "-nshw"],
+	kStubCmap4:  [kOptionNotSeen, "-stubCmap4", None],
+
 }
 
 # Used to compile post table for TTF fonts. We need to stay in syn with the
@@ -380,7 +387,7 @@ class MakeOTFParams:
 		self.srcIsTTF = 0
 		for item in kMOTFOptions.items():
 			exec("self.%s%s = None" % (kFileOptPrefix, item[0]))
-		# DONT_USE_WIN_LINE_METRICS Remove comment from next line to turn on bits 7 and 8 by default.
+		# USE_TYPO_METRICS Remove comment from next line to turn on bits 7 and 8 by default.
 		# exec("self.%s%s = [7,8]" % (kFileOptPrefix, kSetfsSelectionBitsOn))
 
 	def __repr__(self):
@@ -483,9 +490,10 @@ def writeOptionsFile(makeOTFParams, filePath):
 		data.sort() # sort by order in which the options were added
 		data = map(lambda entry: entry[1], data) # reduce list to just the strings
 		data = os.linesep.join(data) + os.linesep
+		data = data.encode('utf-8')
 		print "makeotf [Note] Writing options file", filePath
 		try:
-			fp = open(filePath, "wt")
+			fp = open(filePath, "w")
 			fp.write(data)
 			fp.close()
 		except (IOError, OSError):
@@ -564,6 +572,10 @@ def setOptionsFromFontInfo(makeOTFParams):
 		if re.search(r"SuppressHintWarnings\s+([Tt]rue|1)", data):
 			exec("makeOTFParams.%s%s = 'true'" % (kFileOptPrefix, kSuppressHintWarnings))
 
+	if kMOTFOptions[kStubCmap4][0] == kOptionNotSeen:
+		if re.search(r"stubCmap4\s+([Tt]rue|1)", data):
+			exec("makeOTFParams.%s%s = 'true'" % (kFileOptPrefix, kStubCmap4))
+
 
 
 
@@ -600,7 +612,7 @@ def setOptionsFromFontInfo(makeOTFParams):
 					exec("makeOTFParams.%s%s += [val]" % (kFileOptPrefix, kSetfsSelectionBitsOn))
 			elif not m.group(1) in ["False", "false", "0"]:
 				print "makeotf [Error] Failed to parse value for PreferOS/2TypoMetrics in file '%s'." % (fiPath)
-			print "makeotf [Note] setting the DONT_USE_WIN_LINE_METRICS OS/2 fsSelection bit 7 from fontinfo keyword."
+			print "makeotf [Note] setting the USE_TYPO_METRICS OS/2 fsSelection bit 7 from fontinfo keyword."
 		
 
 		m = re.search(r"IsOS/2WidthWeightSlopeOnly\s+(([Tt]rue|1)|([Ff]alse)|0|1)", data)
@@ -957,10 +969,8 @@ def getOptions(makeOTFParams):
 			exec("makeOTFParams.%s%s = None" % (kFileOptPrefix, kGOADB))
 
 		elif arg == kMOTFOptions[kDoSubset][1]:
-			if (not eval("makeOTFParams.%s%s" % (kFileOptPrefix, kRelease))) and (None == eval("makeOTFParams.%s%s" % (kFileOptPrefix, kDoAlias))):
-				# we don't need to turn Alias on if release mode is on, and Alias has not been explicitly disabled.
-				kMOTFOptions[kDoSubset][0] = i + optionIndex
-				exec("makeOTFParams.%s%s = 'true'" % (kFileOptPrefix, kDoSubset))
+			kMOTFOptions[kDoSubset][0] = i + optionIndex
+			exec("makeOTFParams.%s%s = 'true'" % (kFileOptPrefix, kDoSubset))
 				
 		elif arg == kMOTFOptions[kDoSubset][2]:
 			exec("makeOTFParams.%s%s = 'false'" % (kFileOptPrefix, kDoSubset))
@@ -1206,10 +1216,13 @@ def getOptions(makeOTFParams):
 		elif arg == kMOTFOptions[kSuppressHintWarnings][1]:
 			kMOTFOptions[kSuppressHintWarnings][0] = i + optionIndex
 			exec("makeOTFParams.%s%s = 'true'" % (kFileOptPrefix, kSuppressHintWarnings))
-
 		elif arg == kMOTFOptions[kSuppressHintWarnings][2]:
 			kMOTFOptions[kSuppressHintWarnings][0] = i + optionIndex
 			exec("makeOTFParams.%s%s = 'None'" % (kFileOptPrefix, kSuppressHintWarnings))
+		elif arg == kMOTFOptions[kStubCmap4][1]:
+			kMOTFOptions[kStubCmap4][0] = i + optionIndex
+			exec("makeOTFParams.%s%s = 'true'" % (kFileOptPrefix, kStubCmap4))
+
 
 		else:
 			error = 1
@@ -1470,9 +1483,7 @@ def setMissingParams(makeOTFParams):
 				print "makeotf [Warning] the feature file does not contain a 'vert' feature %s." % (featPath)
 				
 			if not (eval("makeOTFParams.%s%s" % (kFileOptPrefix, kMacCMAPPath)) and
-				eval("makeOTFParams.%s%s" % (kFileOptPrefix, kHUniCMAPPath)) ):
-				error = setCIDCMAPPaths(makeOTFParams, R,O,S)
-			if not eval("makeOTFParams.%s%s" % (kFileOptPrefix, kUVSPath)):
+				eval("makeOTFParams.%s%s" % (kFileOptPrefix, kHUniCMAPPath)) and eval("makeOTFParams.%s%s" % (kFileOptPrefix, kUVSPath)) ):
 				error = setCIDCMAPPaths(makeOTFParams, R,O,S)
 
 	# output file path.
@@ -1751,9 +1762,12 @@ def getGOADBData(goadbPath):
 def compareSrcNames(srcGOADBList, realGOADBList):
 	srcNameList = map(lambda entry: entry[1], srcGOADBList)
 	realNameList = map(lambda entry: entry[1], realGOADBList)
-	if srcNameList == realNameList:
-		return 0  # files match
-	return 1
+	if srcNameList != realNameList:
+		# order or names don't match, report any missing names
+		onlyInSrc = [n for n in srcNameList if n not in realNameList]
+		onlyInReal = [n for n in realNameList if n not in srcNameList]
+		return 1, onlyInSrc, onlyInReal
+	return 0, [], []  # both names and order match
 
 def writeTempGOADB(inputFilePath, srcGOADBList):
 	fpath = inputFilePath + ".temp.GOADB"
@@ -2072,7 +2086,7 @@ def makeRelativePath(curDir, targetPath):
 			cDir = cDir[1:]
 		dirList = re.findall(r"([^\\/]+)", cDir)
 		numDir = len(dirList)
-		relDir = "../"*numDir
+		relDir = (".."+os.path.sep)*numDir
 		targetPath = os.path.join(relDir, targetBaseName)
 	else:
 		if cDir[0] in ["/", "\\"]:
@@ -2083,7 +2097,7 @@ def makeRelativePath(curDir, targetPath):
 		# First build the reative path up.
 		dirList = re.findall(r"([^\\/]+)", cDir)
 		numDir = len(dirList)
-		relDir = "../"*numDir
+		relDir = (".."+os.path.sep)*numDir
 		targetPath = os.path.join(relDir, targetBaseName)
 		targetPath = os.path.join(relDir, tdir, targetBaseName)
 		
@@ -2184,8 +2198,13 @@ def runMakeOTF(makeOTFParams):
 		if use_alias:
 			goadbPath = eval("makeOTFParams.%s%s" % (kFileOptPrefix, kGOADB))
 			realGOADBList = getGOADBData(goadbPath)
-			if compareSrcNames(srcGOADBList, realGOADBList):
+			result, onlyInSrc, onlyInReal = compareSrcNames(srcGOADBList, realGOADBList)
+			if result == 1:
 				print "makeotf [Error] For TTF fonts, the GlyphOrderAndAliasDB file must preserve the original font glyph order, and use the same names as they are derived by the 'tx' tool. %s." % (goadbPath)
+				if onlyInSrc:
+					print "Glyphs in TTF font missing from GlyphOrderAndAliasDB: %s" % " ".join(onlyInSrc)
+				if onlyInReal:
+					print "Glyphs in GlyphOrderAndAliasDB missing from TTF font: %s" % " ".join(onlyInReal)
 				raise MakeOTFRunError
 		else:
 			# If user has not asked to use an existing GOADB file, then we need to make and use one in order to preserve glyph order.
@@ -2228,7 +2247,7 @@ def runMakeOTF(makeOTFParams):
 		osv4Err = 0
 		if makeOTFParams.seenOS2v4Bits[0] == 0:
 			osv4Err = 1
-			print "makeotf [Error] No value was provided for DONT_USE_WIN_LINE_METRICS OS/2 fsSelection bit 7."
+			print "makeotf [Error] No value was provided for USE_TYPO_METRICS OS/2 fsSelection bit 7."
 		if makeOTFParams.seenOS2v4Bits[1] == 0:
 			osv4Err = 1
 			print "makeotf [Error] No value was provided for WEIGHT_WIDTH_SLOPE_ONLY OS/2 fsSelection bit 8."

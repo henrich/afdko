@@ -7,7 +7,7 @@ __copyright__ = """Copyright 2014 Adobe Systems Incorporated (http://www.adobe.c
 """
 
 __usage__ = """
-CompareFamily 2.0.49 Jan 15 2014
+CompareFamily 2.0.50 Feb 2 2015
 
 comparefamily [u] -h] [-d <directory path>] [-tolerance <n>] -rm] [-rn] [-rp] [-nohints] [-l] [-rf] [-st n1,..] [-ft n1,..]
 where 'n1' stands for the number of a test, such as "-st 26" to run Single Test 26.
@@ -31,7 +31,7 @@ CompareFamily will look in the specified directory and examine and
    -d <path>: Look in the specified directory for fonts. Default
       is the current directory
    -toleranance <integer.  set the tolerance for metrics differences in design space units.
-        Default is 0.  Set to a larger value to see only big problems.Affects  Single Test 11 BASE tabvle metrics,
+        Default is 0.  Set to a larger value to see only big problems.Affects  Single Test 11 BASE table metrics,
         Single Test 22 ligature widths, and Single Test 23 Accent Widths.
    -rm:  Write the font menu name report. This prints out a table of the
        font menu names, and enables the font menu name checks.
@@ -1343,7 +1343,7 @@ def doSingleTest2():
 			reporter2_failedvalue.append(len(font.compatibleSubFamilyName3))
 		if nameDict.has_key(font.FullFontName1):
 			nameDict[font.FullFontName1].append(font.PostScriptName1)
-			print "	Error: The Mac platform name ID 4 Prefered Full Name must be unique within Preferred Family Name group. name: '%s'. Conflicting fonts: %s." % (nameDict[font.FullFontName1][0], nameDict[font.FullFontName1][-1])
+			print "	Error: The Mac platform name ID 4 Preferred Full Name must be unique within Preferred Family Name group. name: '%s'. Conflicting fonts: %s." % (nameDict[font.FullFontName1][0], nameDict[font.FullFontName1][-1])
 		else:
 			nameDict[font.FullFontName1] = [font.FullFontName1]
 		if (len(font.FullFontName1) > 63):
@@ -1377,9 +1377,16 @@ def doSingleTest3():
 	for font in fontlist:
 		if not  font.FullFontName1.startswith(font.preferredFamilyName1):
 			print "	Error: Mac platform Full Name  name id 4) '%s' does not begin with the string used for font Preferred Family Name, '%s', for Font %s." %  (font.FullFontName1,  font.preferredFamilyName1,  font.PostScriptName1)
-		if  font.ttFont.has_key('CFF ') and (font.FullFontName1 != font.topDict.FullName):
-			print "	Warning: Mac platform Full Name  name id 4) '%s' is not the same as the font CFF table Full Name, '%s', for Font %s." %  (font.FullFontName1,  font.topDict.FullName,  font.PostScriptName1)
-			print "This has no functional effect, as the CFF Full Name in an OpenType CFF table is never used. However, having different values for differnt copies of the same field and cause confusion when using font development tools."
+		
+		if  font.ttFont.has_key('CFF '):
+			try:
+				cffFullName = font.topDict.FullName
+				if (font.FullFontName1 != cffFullName):
+					print "	Warning: Mac platform Full Name  name id 4) '%s' is not the same as the font CFF table Full Name, '%s', for Font %s." %  (font.FullFontName1,  font.topDict.FullName,  font.PostScriptName1)
+					print "This has no functional effect, as the CFF Full Name in an OpenType CFF table is never used. However, having different values for different copies of the same field and cause confusion when using font development tools."
+			except AttributeError:
+				print "Note: font CFF table has no Full Name entry, for Font %s." %  (font.PostScriptName1)
+				print "This has no functional effect, as the CFF Full Name in an OpenType CFF table is never used."
 
 
 def doSingleTest4():
@@ -1780,13 +1787,13 @@ def doSingleTest16():
 			print "	Warning: OS/2 table usWinDescent field '%s' is not the same as the font bounding box y min '%s'. %s" % (-os2table.usWinDescent, font.fontBBox[1], font.PostScriptName1)
 		if font.fontBBox[3] != os2table.usWinAscent:
 			print "	Warning: OS/2 table usWinAscent field '%s' is not the same as the font bounding box y max '%s'. %s" % (os2table.usWinAscent, font.fontBBox[3], font.PostScriptName1)
-		# make sure that DONT_USE_WIN_LINE_METRICS is on
+		# make sure that USE_TYPO_METRICS is on
 		if not (font.fsSelection & (1<<7)):
 			if os2table.version >= 4:
-				print "	Warning. The OS/2 table version 4 fsSelection field bit 7 'DONT_USE_WIN_LINE_METRICS' is not turned on. Windows applications will (eventually) use the OS/2 sTypo fields only if this bit is on. %s." % (font.PostScriptName1)
+				print "	Warning. The OS/2 table version 4 fsSelection field bit 7 'USE_TYPO_METRICS' is not turned on. Windows applications will (eventually) use the OS/2 sTypo fields only if this bit is on. %s." % (font.PostScriptName1)
 		else:
 			if os2table.version < 4:
-				print "	Error. The OS/2 table version 4 fsSelection field bit 7 'DONT_USE_WIN_LINE_METRICS' is set on, but the OS/2 version '%s' is not 4 or greater.. %s." % (os2table.version, font.PostScriptName1)
+				print "	Error. The OS/2 table version 4 fsSelection field bit 7 'USE_TYPO_METRICS' is set on, but the OS/2 version '%s' is not 4 or greater.. %s." % (os2table.version, font.PostScriptName1)
 	if len(emSquareeDict.keys()) > 1:
 		print "	Error: fonts in family have different em-squares! %s." % (font.preferredFamilyName1)
 		for item in emSquareeDict.items():
@@ -1871,7 +1878,7 @@ def doSingleTest17():
 						print "\t\t" + name
 
 
-hintPat = re.compile(r"(?:(\s-*\d+)(\s-*\d+)*)\s([a-z]+)")
+hintPat = re.compile(r"(?:(\s-*[0-9.]+)(\s-*[0-9.]+)*)\s([a-z]+)")
 def checkHintEntry(entry, missingHintsGlyphs, glyphBox, fontPSName):
 	errorCount = 0
 	errMsgs = []
@@ -3479,7 +3486,7 @@ def doFamilyTest10():
 					panoseStatus = 1
 					break
 
-		return panoseStatus # 0 means all the values are 0; 1 means they were probably dervived by MakeOTF; 2 means they exist, and were not derived by MakeOTF.
+		return panoseStatus # 0 means all the values are 0; 1 means they were probably derived by MakeOTF; 2 means they exist, and were not derived by MakeOTF.
 	firstFontName = ""
 	print "\nFamily Test 10: Check that if all faces in family have a Panose number and that CFF ISFixedPtch matches the Panose monospace setting."
 	for name in preferredFamilyList1.keys():
@@ -4037,7 +4044,7 @@ def doFamilyTest19():
 	global compatibleFamilyList3
 
 	print "\nFamily Test 19: Check that all faces in the Preferred Family group have the same values of FamilyBlues and FamilyOtherBlues, and are valid."
-	# A preferred family can contain grousp of fonts that have different Family Blues; different optical sizes, for example.
+	# A preferred family can contain groups of fonts that have different Family Blues; different optical sizes, for example.
 	# What I will do is collect a dict of unique FamilyBlue values, and report on any that are unique, or do not contain a "regular" member".
 
 	FBList = [ ["FamilyBlues", "BlueValues", {}, 0], ["FamilyOtherBlues", "OtherBlues",{}, 0]]
@@ -4860,7 +4867,7 @@ def main():
 	import agd
 	fdkToolsDir, fdkSharedDataDir = FDKUtils.findFDKDirs()
 	sys.path.append(fdkSharedDataDir)
-	kAGD_TXTPath = os.path.join(fdkSharedDataDir, "AGD.TXT")
+	kAGD_TXTPath = os.path.join(fdkSharedDataDir, "AGD.txt")
 	fp = open(kAGD_TXTPath, "rU")
 	agdTextPath = fp.read()
 	fp.close()

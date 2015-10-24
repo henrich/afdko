@@ -48,6 +48,7 @@ public boolean writecoloredbez = TRUE;
 public Fixed bluefuzz;
 public boolean doAligns, doStems;
 public boolean idInFile;
+public boolean roundToInt;
 private int maxStemDist = MAXSTEMDIST;
 
 
@@ -140,6 +141,7 @@ public unsigned char * Alloc(integer sz)
 	return s;
   }
 
+
 public procedure InitData(integer reason)
  {
   register char *s;
@@ -147,13 +149,13 @@ public procedure InitData(integer reason)
 
   switch (reason) {
     case STARTUP:
+      DEBUG = FALSE;
 	  DMIN = 50;
       DELTA = 0;
       YgoesUp = (dtfmy(FixOne) > 0) ? TRUE : FALSE;
       initBigDist = PSDist(maxStemDist);
       /* must be <= 168 for ITC Garamond Book Italic p, q, thorn */
       minDist = PSDist(7);
-      minMidPt = PSDist(62);
       ghostWidth = PSDist(20);
       ghostLength = PSDist(4);
       bendLength = PSDist(2);
@@ -180,15 +182,14 @@ public procedure InitData(integer reason)
       minVal = 1.0 / (real)(FixOne);
       autoHFix = autoVFix = FALSE;
       editChar = TRUE;
+      roundToInt = true;
       /* Default is to change a curve with collinear points into a line. */
       autoLinearCurveFix = TRUE;
       flexOK = FALSE;
       flexStrict = FALSE;
-      AutoExtraDEBUG = FALSE;
-      logging = FALSE;
+      AutoExtraDEBUG = DEBUG;
+      logging = DEBUG;
       debugColorPath = FALSE;
-      /* DEBUG */
-      DEBUG = FALSE;
       showClrInfo = DEBUG;
       showHs = showVs = DEBUG;
       listClrInfo = DEBUG;
@@ -250,7 +251,8 @@ public boolean AutoColor(
 			 short total_files,
 			 char *fileNamePtr[],
 			 boolean quiet,
-			 boolean doAll,
+             boolean doAll,
+             boolean roundCoords,
 			 boolean doLog)
 {
   boolean result, renameLog = FALSE;
@@ -267,6 +269,7 @@ public boolean AutoColor(
 #endif
   if (!ReadFontInfo()) return FALSE;
   editChar = changeChar;
+  roundToInt = roundCoords;
   if ((editChar) && fixStems)
     autoVFix = autoHFix = fixStems;
   autoLinearCurveFix = editChar;

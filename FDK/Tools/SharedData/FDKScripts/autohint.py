@@ -1,17 +1,19 @@
 #!/bin/env python
-__copyright__ = """Copyright 2014 Adobe Systems Incorporated (http://www.adobe.com/). All Rights Reserved.
+__copyright__ = """Copyright 2015 Adobe Systems Incorporated (http://www.adobe.com/). All Rights Reserved.
 """
 
 __usage__ = """
-autohint  AutoHinting program v1.45 Mar 20 2014
+autohint  AutoHinting program v1.48 May 26 2015
 autohint -h
 autohint -u
 autohint -hfd
 autohint -pfd
-autohint [-g <glyph list>] [-gf <filename>] [-xg <glyph list>] [-xgf <filename>] [-cf path] [-a] [-logOnly] [-log <logFile path>] [-r] [-q] [-c] [-nf] [-ns] [-nb] [-o <output font path>]  font-path
+autohint [-g <glyph list>] [-gf <filename>] [-xg <glyph list>] [-xgf <filename>] [-cf path] [-a] [-logOnly] [-log <logFile path>] [-r] [-q] [-c] [-nf] [-ns] [-nb] [-wd] [-o <output font path>]  font-path
 
 Auto-hinting program for PostScript and OpenType/CFF fonts.
 """
+
+from ufoTools import kProcessedGlyphsLayerName, kProcessedGlyphsLayer
 
 __help__ = __usage__ + """
 
@@ -139,6 +141,10 @@ alignment zones in an "fontinfo" file.
 	if they already have hints. However, glyphs will not be hinted if
 	they both have not changed and are in the history file.
 
+ -decimal  Use decimal coordinates, instead of rounding them to the 
+ nearest integer value.
+
+-wd	write changed glyphs to default layer instead of '%s'
 
 autohint can also apply different sets of alignment zones while hinting
 a particular set of glyphs. This is useful for name-keyed fonts, which,
@@ -173,7 +179,8 @@ glyph has hints, then autohint assumes it was manually hinted, and will by
 default not hint it again. If the file is missing, autohint will assume that all
 the glyphs were manually hinted, and you will have to use the option -a or -r to
 hint any glyphs.
-"""
+""" % (kProcessedGlyphsLayerName)
+
 
 __FDDoc__ = """
 By default, autohint uses the font's global alignment zones and stem
@@ -473,6 +480,8 @@ class ACOptions:
 		self.printDefaultFDDict = 0
 		self.printFDDictList = 0
 		self.debug = 0
+		self.allowDecimalCoords = 0
+		self.writeToDefaultLayer = 0
 		
 class ACOptionParseError(KeyError):
 	pass
@@ -723,6 +732,10 @@ def getOptions():
 			options.outputPath = sys.argv[i]
 		elif arg == "-d":
 			options.debug = 1
+		elif arg == "-decimal":
+			options.allowDecimalCoords = True
+		elif arg =="-wd":
+			options.writeToDefaultLayer = 1
 		elif arg[0] == "-":
 			raise ACOptionParseError("Option Error: Unknown option <%s>." %  arg) 
 		else:
@@ -914,7 +927,7 @@ def openFile(path, outFilePath, useHashMap):
 		font =  openOpenTypeFile(path, outFilePath)
 	else:
 		# maybe it is a a UFO font.
-		# We always use the hash map to skip glyphs that have been previously processed, unless the user has said to do all.
+		# We always use the hash map to skip glyphs that have been previously processed, unless the user has report only, not make changes.
 		font =  openUFOFile(path, outFilePath, useHashMap)
 	return font
 
@@ -936,6 +949,8 @@ def openUFOFile(path, outFilePath, useHashMap):
 		shutil.copytree(path , outFilePath)
 		path = outFilePath
 	font = ufoTools.UFOFontData(path, useHashMap, ufoTools.kAutohintName)
+	font.useProcessedLayer = True
+	font.requiredHistory.append(ufoTools.kCheckOutlineName) # Programs in this list must be run before autohint, if the outlines have been edited.
 	return font
 	
 def openOpenTypeFile(path, outFilePath):
@@ -1024,8 +1039,11 @@ def hintFile(options):
 	logMsg("Hinting font %s. Start time: %s." % (path, time.asctime()))
 
 	try:
-		useHashMap = not options.hintAll # for UFO fonts only. We always use the hash map to skip glyphs that have been previously processed, unless the user has said to do all.
-		fontData = openFile(path, options.outputPath, not options.hintAll)
+		useHashMap = not options.logOnly # for UFO fonts only. We always use the hash map, unless the user has said to only report issues.
+		fontData = openFile(path, options.outputPath, useHashMap)
+		fontData.allowDecimalCoords = options.allowDecimalCoords
+		if options.writeToDefaultLayer and hasattr(fontData, "setWriteToDefault"): # UFO fonts only
+			fontData.setWriteToDefault()
 	except (IOError, OSError):
 		logMsg( traceback.format_exception_only(sys.exc_type, sys.exc_value)[-1])
 		raise ACFontError("Error opening or reading from font file <%s>." % fontFileName)
@@ -1138,17 +1156,23 @@ def hintFile(options):
 	else:
 		supressHintSubArg = ""
 
+	if options.allowDecimalCoords:
+		decimalArg = " -d"
+	else:
+		decimalArg = ""
+
 	dotCount = 0
 	seenGlyphCount = 0
 	processedGlyphCount = 0
 	for name in glyphList:
 		prevACIdentifier = None
-		seenGlyphCount +=1 
+		seenGlyphCount +=1
+			
 		# 	Convert to bez format
-		bezString, width = fontData.convertToBez(name, removeHints, options.verbose)
+		bezString, width = fontData.convertToBez(name, removeHints, options.verbose, options.hintAll)
+		processedGlyphCount += 1
 		if bezString == None:
 			continue
-		processedGlyphCount += 1
 
 		if "mt" not in bezString:
 			# skip empty glyphs.
@@ -1223,7 +1247,6 @@ def hintFile(options):
 				# This in turn give reasonable performance when calling autohint in a subprocess
 				# and getting output with std.readline()
 
-		anyGlyphChanged = 1
 		# 	Call auto-hint library on bez string.
 		bp = open(tempBez, "wt")
 		bp.write(bezString)
@@ -1238,7 +1261,7 @@ def hintFile(options):
 		else:
 			if os.path.exists(tempBezNew):
 				os.remove(tempBezNew)
-			command = "autohintexe %s%s%s -s .new -f \"%s\" \"%s\"" % (verboseArg, suppressEditArg, supressHintSubArg, tempFI, tempBez)
+			command = "autohintexe %s%s%s%s -s .new -f \"%s\" \"%s\"" % (verboseArg, suppressEditArg, supressHintSubArg, decimalArg, tempFI, tempBez)
 			if  options.debug:
 				print command
 			report = FDKUtils.runShellCmd(command)
@@ -1246,7 +1269,6 @@ def hintFile(options):
 				if not options.verbose:
 					logMsg("") # end series of "."
 				logMsg(report)
-	
 			if os.path.exists(tempBezNew):
 				bp = open(tempBezNew, "rt")
 				newBezString = bp.read()
@@ -1260,7 +1282,9 @@ def hintFile(options):
 				newBezString = None
 			
 		if not newBezString:
-			print "Error - failure in processing outline data"
+			if not options.verbose:
+				logMsg("")
+			logMsg("%s Error - failure in processing outline data." % aliasName(name))
 			continue
 			
 		if not (("ry" in newBezString[:200]) or ("rb" in newBezString[:200]) or ("rm" in newBezString[:200]) or ("rv" in newBezString[:200])):
@@ -1270,6 +1294,7 @@ def hintFile(options):
 			continue
 			
 		# 	Convert bez to charstring, and update CFF.
+		anyGlyphChanged = 1
 		fontData.updateFromBez(newBezString, name, width, options.verbose)
 
 		

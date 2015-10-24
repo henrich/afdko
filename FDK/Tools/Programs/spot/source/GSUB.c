@@ -2057,7 +2057,7 @@ static void showContext2(ContextSubstFormat2 *fmt, IntX level, void *feattag)
 		ttoEnumRec *classList;
 		Card32 cnt, scscnt, psIndex;
 		IntX i, forProofing, isVert;
-		char proofString[1024];
+		char proofString[kProofBufferLen];
 		classList = memNew(sizeof(ttoEnumRec) * (fmt->SubClassSetCnt));
 		ttoEnumerateClass(fmt->ClassDef, fmt->_ClassDef, 
 						  fmt->SubClassSetCnt,
@@ -2087,9 +2087,7 @@ static void showContext2(ContextSubstFormat2 *fmt, IntX level, void *feattag)
 
 					if (subclassrule->GlyphCount > fmt->SubClassSetCnt)
 					 {
-					  if (level == 7)
-						  fprintf(OUTPUTBUFF,"\n# ");
-					  warning(SPOT_MSG_GSUBCTXDEF, subclassrule->GlyphCount, fmt->SubClassSetCnt);
+                        warning(SPOT_MSG_GSUBCTXDEF, subclassrule->GlyphCount, fmt->SubClassSetCnt);
 					 }
 
 					seqindex = subclassrule->SubstLookupRecord[0].SequenceIndex;
@@ -2128,6 +2126,15 @@ static void showContext2(ContextSubstFormat2 *fmt, IntX level, void *feattag)
 							GlyphId glyphId2 = *da_INDEX(CR->glyphidlist, c);
 							strcpy(name2, getGlyphName(glyphId2, forProofing));
 							psIndex = strlen(proofString);
+                            if ((psIndex + strlen(name2) + 10) >= kProofBufferLen)
+                            {
+                                if (level == 7)
+                                    fprintf(OUTPUTBUFF, "\n    %s", proofString);
+                                else if (level == 8)
+                                    dumpMessage(proofString, ((Card32 *)feattag)[0]);
+                                proofString[0] = 0;
+                                psIndex = 0;
+                            }
 							sprintf(&proofString[psIndex]," %s", name2);
 						  }
 						psIndex = strlen(proofString);
@@ -2929,7 +2936,7 @@ static void decompileChainContext3(ChainContextSubstFormat3 *fmt)
 						limit=nitems;
 						fprintf(OUTPUTBUFF, " [");
 					  }else if(nitems>1 && itemnumber==0)
-						fprintf(OUTPUTBUFF, "\n# WARNING: GSUB: Cannot decompile multiple inputs with more than one group greater than 1.\n");
+                        warning(SPOT_MSG_GSUBMULTIPLEINPUTS);
 					  
 					  if(nitems>1)	
 						  inputgid[i] = *da_INDEX(ter->glyphidlist, (Int32)itemnumber);
@@ -3329,8 +3336,10 @@ static void proofChainContext3(ChainContextSubstFormat3 *fmt)
 				  	limit=nitems;
 				  	proofSymbol(proofctx, PROOF_LPAREN);
 				  }else if(nitems>limit && itemnumber==0)
-				  	fprintf(OUTPUTBUFF, "\n# WARNING: GSUB: Cannot proof multiple inputs with more than one group greater than 1. Not all substitutions may be displayed.\n");
-				  if(nitems>1 && itemnumber<nitems)	
+                  {
+                    proofMessage(proofctx, (Byte8*)spotMsg(SPOT_MSG_GSUBMULTIPLEINPUTS));
+ 				  }
+                 if(nitems>1 && itemnumber<nitems)
 					  inputgid[i] = *da_INDEX(ter->glyphidlist, (Int32)itemnumber);
 				  else if (nitems>1)
 				  	  inputgid[i] = *da_INDEX(ter->glyphidlist, (Int32)nitems-1);

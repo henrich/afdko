@@ -10,7 +10,7 @@ This software is licensed as OpenSource, under the Apache License, Version 2.0. 
 #include "machinedep.h"
 
 
-const char *libversion = "1.5.10";
+const char *libversion = "1.5.11";
 const char *progname="AC_C_lib";
 char editingResource=0;
 
@@ -252,7 +252,7 @@ int cleanup(short code)
 }
 
 
-ACLIB_API int  AutoColorString(const char *srcbezdata, const char *fontinfo, char *dstbezdata, int *length, int allowEdit, int allowHintSub, int debug)
+ACLIB_API int  AutoColorString(const char *srcbezdata, const char *fontinfo, char *dstbezdata, int *length, int allowEdit, int allowHintSub, int roundCoords, int debug)
 {
 	int value, result;
 	char *names[]={""};
@@ -322,7 +322,9 @@ ACLIB_API int  AutoColorString(const char *srcbezdata, const char *fontinfo, cha
 			   1,
 		       names, 
 			   FALSE, /*quiet*/ 
-			   FALSE, FALSE);
+                FALSE, /* doAll*/
+                roundCoords, /* doAll*/
+                FALSE);/* do log */
 	/* result == TRUE is good */
 	/* The following call to cleanup() always returns control to just after the setjmp() function call above,,
 	but with value set to 1 if success, or -1 if not */

@@ -1769,7 +1769,7 @@ static int preParseGLIFS(ufoCtx h)
     return retVal;
 }
 
-static void addCharFromGLIF(ufoCtx h, int tag, long char_begin, long char_end, unsigned long unicode)
+static void addCharFromGLIF(ufoCtx h, int tag, char* glyphName, long char_begin, long char_end, unsigned long unicode)
 {
     abfGlyphInfo *chr;
 
@@ -1783,7 +1783,7 @@ static void addCharFromGLIF(ufoCtx h, int tag, long char_begin, long char_end, u
     {
         chr->flags 		= 0;
         chr->tag		= tag;
-        chr->gname.ptr	= NULL;
+        chr->gname.ptr	= glyphName;
         chr->gname.impl	= tag;
         chr->iFD		= 0;
         if (unicode != ABF_GLYPH_UNENC)
@@ -1907,7 +1907,7 @@ static int preParseGLIF(ufoCtx h, GLIF_Rec* glifRec, int tag)
         else if (tokenEqualStr(tk, "</glyph>"))
         {
             if (char_begin == 0) // happens when there is no <outline> element, which can happen with spaces.
-                addCharFromGLIF(h, tag, char_begin, char_end, unicode);
+                addCharFromGLIF(h, tag, glifRec->glyphName, char_begin, char_end, unicode);
             state = 0;
             h->flags |= SEEN_END;
             break;
@@ -1975,7 +1975,7 @@ static int preParseGLIF(ufoCtx h, GLIF_Rec* glifRec, int tag)
             }
             state = 1;
             char_end = tk->offset;
-            addCharFromGLIF(h, tag, char_begin, char_end, unicode);
+            addCharFromGLIF(h, tag, glifRec->glyphName, char_begin, char_end, unicode);
             state = 0;
             break;
         }
@@ -2318,9 +2318,7 @@ static int parsePoint(ufoCtx h, abfGlyphCallbacks *glyph_cb, GLIF_Rec* glifRec, 
                 float xnew = mtx[0]*x + mtx[2]*y + mtx[4];
                 y = mtx[1]*x + mtx[3]*y + mtx[5];
                 x = xnew;
-            }
-            x = (float)round(x);
-            y = (float)round(y);
+           }
             CHKOFLOW(2);
             PUSH(x);
             PUSH(y);
@@ -3248,7 +3246,7 @@ static int parseGLIF(ufoCtx h, abfGlyphInfo* gi, abfGlyphCallbacks *glyph_cb, Tr
     int contourStartOpIndex = 0;
     token* tk;
     
-    STI sti =  (STI)gi->gname.impl;
+    STI sti =  (STI)gi->tag;
     GLIF_Rec* glifRec = &h->data.glifRecs.array[sti];
     
     /* open the file */
@@ -3343,7 +3341,7 @@ static int parseGLIF(ufoCtx h, abfGlyphInfo* gi, abfGlyphCallbacks *glyph_cb, Tr
                 if (h->data.opList.cnt > 1)
                 {
                     OpRec* firstOpRec = &h->data.opList.array[contourStartOpIndex];
-                    /* Now we need to fix up the OpList. In GLIF, there is usually no explicit start point, as the format expresses
+                   /* Now we need to fix up the OpList. In GLIF, there is usually no explicit start point, as the format expresses
                      the path segments as a complete closed path, with no explicit start point.
                      
                      I use the first path operator end point as the start point, and convert this first operator to move-to.
@@ -3366,30 +3364,16 @@ static int parseGLIF(ufoCtx h, abfGlyphInfo* gi, abfGlyphCallbacks *glyph_cb, Tr
                         PUSH(firstOpRec->coords[0]);
                         PUSH(firstOpRec->coords[1]);
                         doOp_ct(h, glyph_cb, h->hints.pointName); /* adds a new curve opRec to the op list, using the point name (if any) of the first point of the curve.  */
+                        
+                        /* doOp_ct can resize the opList array, invalidating the firstOpRec pointer */
+                        firstOpRec = &h->data.opList.array[contourStartOpIndex];
+                        firstOpRec->opType = movetoType;
+                        
                         h->hints.pointName = NULL;
 
-                        firstOpRec->opType = movetoType;
                      }
                     
-                     
-                    
-                    switch(firstOpRec->opType)
-                    {
-                        case 0:
-                        case 1:
-                            // If the first op was an real move-to, we don't need to do anything,
-                            break;
-                        case 2:
-                            // If it was line-to, we also don't need to do anything. An implicit line-to will do just fine.
-                            break;
-                        case 3:
-                            CHKOFLOW(2);
-                            PUSH(firstOpRec->coords[0]);
-                            PUSH(firstOpRec->coords[1]);
-                            doOp_ct(h, glyph_cb, NULL);
-                            break;
-                    }
-                }
+                 }
                  h->stack.flags &= ~((unsigned long)(PARSE_PATH | PARSE_SEEN_MOVETO));
 			}
             else if (tokenEqualStr(tk, "<point"))
@@ -3527,7 +3511,7 @@ static int readGlyph(ufoCtx h, unsigned short tag, abfGlyphCallbacks *glyph_cb)
 	gi = &h->chars.index.array[tag];
     
 	/* note that gname.ptr is not stable: it is a pointer into the h->string->buf array, which moves when it gets resized. */
-	gi->gname.ptr = getString(h, (STI)gi->gname.impl);
+	gi->gname.ptr = getString(h, (STI)gi->tag);
 	result = glyph_cb->beg(glyph_cb, gi);
 	gi->flags |= ABF_GLYPH_SEEN;
 	result = h->metrics.cb.beg(&h->metrics.cb, &h->metrics.gi);
@@ -3544,7 +3528,7 @@ static int readGlyph(ufoCtx h, unsigned short tag, abfGlyphCallbacks *glyph_cb)
             fatal(h, ufoErrParseFail, NULL);
     }
     
-    width = getWidth(h, (STI)gi->gname.impl);
+    width = getWidth(h, (STI)gi->tag);
     glyph_cb->width(glyph_cb, (float)width );
     if (result == ABF_WIDTH_RET)
         return ufoSuccess;
@@ -3691,7 +3675,7 @@ static int CTL_CDECL matchChar(const void *key, const void *value, void *ctx)
 {
 	ufoCtx h = ctx;
 	return strcmp((char *)key, getString(h, (STI)h->chars.index.array
-										 [*(long *)value].gname.impl) );
+										 [*(long *)value].tag) );
 }
 
 /* Add char record. Return 1 if record exists else 0. Char record returned by
@@ -3834,8 +3818,9 @@ static int CTL_CDECL postMatchChar(const void *key, const void *value,
 								   void *ctx)
 {
 	ufoCtx h = ctx;
-	return strcmp((char *)key, getString(h, (STI)h->chars.index.array
-										 [*(long *)value].gname.impl) );
+    char * testKey = getString(h, (STI)h->chars.index.array
+                               [*(long *)value].tag);
+	return strcmp((char *)key, testKey );
 }
 
 int ufoGetGlyphByName(ufoCtx h, char *gname, abfGlyphCallbacks *glyph_cb)

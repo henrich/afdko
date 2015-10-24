@@ -254,8 +254,7 @@ inline
 #else
 static
 #endif
-void special_inits()
-{
+void special_inits() {
   InitCursorCtl((acurHandle) 0);
 }
 #endif
@@ -266,16 +265,19 @@ inline
 #else
 static
 #endif
-void special_fopen_actions(char * s)
-{
+void special_fopen_actions(char * s) {
   fsetfileinfo (s, MAC_FILE_CREATOR, 'TEXT');
 }
 #endif
 
 /* Define usable bits for set.c stuff */
 #define BytesPerWord	sizeof(unsigned)
-#define	WORDSIZE		(sizeof(unsigned)*8)
-#define LogWordSize     (WORDSIZE==16?4:5)
+#ifndef WORDSIZE
+#define WORDSIZE        (sizeof(unsigned) * 8)
+#endif
+#ifndef LogWordSize
+#define LogWordSize     (WORDSIZE == 16 ? 4 : 5)
+#endif
 
 #ifndef TRUE
 #define TRUE 1

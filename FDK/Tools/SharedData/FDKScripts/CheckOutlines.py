@@ -3,7 +3,7 @@ __copyright__ = """Copyright 2014 Adobe Systems Incorporated (http://www.adobe.c
 
 
 __usage__ = """
-CheckOutlines v1.23 April 16 2014
+CheckOutlines v1.25 May 20 2015
 
 Outline checking program for OpenType/CFF fonts.
 
@@ -193,7 +193,7 @@ orientation problems, which always need to be fixed.
 error_doc = """
 The following is list of the checkOutlines error messages, and a brief
 explanation of each. The error messages here may be just the first part
-of the actual message, with additional info and cordinates given in the
+of the actual message, with additional info and coordinates given in the
 rest of the actual message.
 
 The phrase 'subpath' means what in FontLab is a contour: a complete
@@ -350,8 +350,8 @@ class focusOptions:
 		self.arcTolerance = ""
 		self.pathTolerance = ""
 		self.emSquare = ""
-		self.skipIfUnchanged = False
-		self.checkAll = False # overrides skipIfUnchanged: forces all glyphs to be processed even if src hasn't changed.
+		self.checkAll = False # forces all glyphs to be processed even if src hasn't changed.
+		self.allowDecimalCoords = 0
 
 
 class FDKEnvironmentError(AttributeError):
@@ -478,6 +478,8 @@ def getOptions():
 			sys.exit()
 		elif arg == "-d":
 			debug = 1
+		elif arg == "-decimal":
+			options.allowDecimalCoords = True
 		elif arg == "-g":
 			i = i +1
 			glyphString = sys.argv[i]
@@ -498,7 +500,6 @@ def getOptions():
 			options.glyphList += parseGlyphListArg(glyphString)
 		elif arg == "-e":
 			options.allowChanges = 1
-			skipIfUnchanged = True
 		elif arg == "-v":
 			options.beVerbose = 1
 		elif arg == "-V":
@@ -517,7 +518,7 @@ def getOptions():
 			options.doSpikeTest = 1
 		elif arg == "-3":
 			options.doTriangleTest = 1
-		elif arg == "-r":
+		elif arg == "-4":
 			options.doNearlyVH = 1
 		elif arg == "-O":
 			options.doPathDirectionTest = 0
@@ -673,13 +674,15 @@ def openUFOFile(path, outFilePath, useHashMaps):
 	# If user has specified a path other than the source font path, then copy the entire
 	# ufo font, and operate on the copy.
 	if (outFilePath != None) and (os.path.abspath(path) != os.path.abspath(outFilePath)):
-		msg = "Copying from source UFO font to output UFO fot before processing..."
+		msg = "Copying from source UFO font to output UFO font before processing..."
 		logMsg(msg)
 		if os.path.exists(outFilePath):
 			shutil.rmtree(outFilePath)
 		shutil.copytree(path , outFilePath)
 		path = outFilePath
 	font = ufoTools.UFOFontData(path, useHashMaps, ufoTools.kCheckOutlineName)
+	font.useProcessedLayer = False # always read glyphs from default layer.
+	font.requiredHistory = [] # Programs in this list must be run before autohint, if the outlines have been edited.
 	return font
 	
 def openOpenTypeFile(path, outFilePath):
@@ -754,7 +757,8 @@ def checkFile(path, options):
 	fontFileName = os.path.basename(path)
 	logMsg("Checking font %s. Start time: %s." % (path, time.asctime()))
 	try:
-		fontData = openFile(path, options.outFilePath, options.allowChanges and (not options.checkAll))
+		fontData = openFile(path, options.outFilePath, options.allowChanges)
+		fontData.allowDecimalCoords = options.allowDecimalCoords
 	except (IOError, OSError):
 		logMsg( traceback.format_exception_only(sys.exc_type, sys.exc_value)[-1])
 		raise focusFontError("Error opening or reading from font file <%s>." % fontFileName)
@@ -801,8 +805,7 @@ def checkFile(path, options):
 			os.remove(kTempFilepathOut)
 		
 		# 	Convert to bez format
-		bezString, width= fontData.convertToBez(name, removeHints, options.beVerbose)
-			
+		bezString, width = fontData.convertToBez(name, removeHints, options.beVerbose, options.checkAll)
 		if bezString == None:
 			continue
 		processedGlyphCount += 1
@@ -835,7 +838,7 @@ def checkFile(path, options):
 			fp.close()
 			if bezData != bezString:
 				fontData.updateFromBez(bezData, name, width, options.beVerbose)
-			seenChangedGlyph = 1
+				seenChangedGlyph = 1
 
 	if not options.beVerbose:
 		logMsg("")

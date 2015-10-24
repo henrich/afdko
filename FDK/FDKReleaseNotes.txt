@@ -1,7 +1,212 @@
-<?xml version="1.0" encoding="utf-8"?>
 FDKReleaseNotes.txt
 ===============================================================================
 
+FDK. v2.5 July 17 change number 64655.
+
+FDK. 
+	autohint.
+	Fixed bug in ufoFontTools.py which placed a new hint block after a flex
+	operator, when it should be before.
+	Fixed new bug in hinting non-UFO fonts, introduced by switch to absolute
+	coordinates in the bez file interchange format.
+	Fixed bugs in using hashmap to detect previously hinted glyphs.
+	Fixed bugs in handling the issue that checkOutlinesUFO.py, which uses the
+	defcon library to write UFO glif files, will in some cases write glif files
+	with different file names than they had in the default glyph layer.
+
+	makeotf. Fixed bug with Unicode values in the absolute path to to the font
+	home directory.
+	Add support for Character Variant (cvXX) feature params.
+	Fixed bug where setting Italic style forced OS/2 version to be 4.
+	
+	spot. Added support for cvXX feature params. 
+	Fixed in crash in dumping long contextual substitution strings, such as in
+	'GentiumPlus-R.ttf'.
+	
+	tx, IS, mergeFonts rotateFont:
+	fixed bug in handling CID glyph ID greater than 32K.
+	Changed to write widths and FontBBox as integer values
+	Changed to write SVG, UFO, and dump coordinates with 2 places of precision
+	when there is a fractional part.
+	Fixed bugs in handling the '-gx' option to exclude glyphs. Fixed problem
+	with CID > 32K. Fixed problem when font has 65536 glyphs: all glyphs after
+	first last would be excluded.
+	Fixed rounding errors in writing out decimal values to cff and t1 fonts
+	Increased interpreter stack depth to allow for CUBE operators (Library
+	elements) with up to 9 blend axes.
+	
+	misc
+	Fixed windows builds: had to provide a roundf() function, and more includes for
+	the _tmpFile function. Fixed a few compile errors.
+	Fix bug in documentation for makeInstancesUFO
+	Fix bug in BezTools.py on Windows, when having to use a temp file
+
+
+FDK. v2.5 May 26 change number 64261.
+
+	autohintexe. Worked through a lot of problems with fractional coordinates.
+	In the previous release, autohintexe was changed to read and write
+	fractional values. However, internal value storage used a Fixed format with
+	only 7 bits of precision for the value. This meant that underflow errors
+	occurred with 2 decimal places, leading to incorrect coordinates. I was able
+	to fix this by changing the code to use 8 bits of precision, which supports
+	2 decimal places (but not more!) without rounding errors, but this required
+	many changes. The current autohint output will match the output of the
+	previous version for integer input values, with two exceptions. Fractional
+	stem values will (rarely) differ in the second decimal place. The new
+	version will also choose different hints in glyphs which have coordinate
+	values outside of the range -16256 to +16256; the previous version had a bug
+	in calculating weights for stems.
+	
+	autohint. Changed logic for writing bez files to write absolute coordinate
+	values instead of relative coordinate values. Fixed bug where truncation of
+	decimal values lead to cumulative errors in positions adding up to more than
+	1 design unit over the length of a path.
+	
+	tx. Fixed bugs in handling fractional values. tx had a bug with writing
+	fractional values that are very near an integer value for the modes -dump.
+	-svg, and -ufo. 'tx' also always applied the logic for applying a user
+	transform matrix, even though the default transform is the identity
+	transform. This has the side-effect of rounding to integer values.
+	
+FDK. v2.5 April 8 change number 64043.
+
+	checkOutlinesUFO.
+	Added  new logic to delete any glyphs from the processed layer which are
+	not in the ‘glyphs’ layer.
+
+	makeotf.
+	When building CID font, some error messages were printed twice. 
+	Add new option -stubCmap4. This causes makeotf to build only a stub cmap 4
+	subtable, with just two segments. Needed only for special cases like
+	AdobeBlank, where every byte is an issue. Windows requires a cmap format 4
+	subtable, but not that it be useful.
+
+	makeCIDFont.
+	Output FontDict was sized incorrectly. A function at the end adds some FontInfo keys, but did not increment the size of the dict. Legacy logic is to make the FontInfo dict be 3 larger than the current number of keys.
+
+	makeInstanceUFO:
+	Changed FDK branch of mutatorMath so that kern values, glyph widths, and the
+	BlueValues family of global hint values are all rounded to integer even when
+	the –decimal option is used.
+	makeInstanceUFO now deletes the default ‘glyphs’  layer of the target
+	instance font before generating the instance. This solves the problem that
+	when glyphs are removed from the master instances, the instance font still
+	has them.
+	Added a new logic to delete any glyphs from the processed layer which are
+	not in the ‘glyphs’ layer.
+	Removed the ‘-all’ option: even though mutatorMath rewrites all the glyphs,
+	the hash values are still valid for glyphs which have not been edited. This
+	means that if the developer edits only a few glyphs in the master designs,
+	only those glyphs in the instances will get processed by checkOutlinesUFO
+	and autohint .
+
+	Support decimal coordinate values in fonts in UFO workflow.
+
+	checkOutlinesUFUO (but not checkOutlines), autohint, and makeInstancesUFO
+	will now all pass through decinal coordinates without rounding, if you use
+	the new option "-decimal". 'tx' will dump decinal values with 3 decimal places.
+
+	'tx' already reported fractional values, but needed to be modified to report
+	only 3 decimal places when writing UFO glif files, and in PDF output mode -
+	Acrobat won't read PDF files with 9 decimal places in position values.
+	
+	This allows a developer to use a much higher precision of point positioning
+	without using a large em-square. The Adobe Type group found that using an
+	em-square of other than 1000 design units still causes problems in layout
+	and text selection line height in many apps, despite it being legal by the
+	Type 1 and CFF specifications. 
+	
+	Note that code design issues in 'autohint'currently limit the decimal
+	precision and accuracy to 2 decimal places. 1.01 is works, 1.001 will be
+	rounded to 0.
+	
+	
+	
+FDK. v2.5 March 3 2015 change number 63782.
+
+	tx.
+	Fix bug in reading ttf's. Font version was taken from the name table, which
+	can include a good deal more than just the font version. Changed to read
+	fontRevision from the head table.
+	
+	detype1.
+	Changed to wrap line only after an operator name, so that the coordinates
+	for a command and the command name would stay on one line.
+	
+	Misc.
+	otf2otc.py. Pad table data with 0's so as to align tables on a 4 boundary. Submitted by Cosimo Lupo.
+	
+FDK v2.5 Feb 21 2015 change number 63718.
+
+	autohint
+	Fixed a bug with processing flex hints in ufoTools.py, that caused outline distortion.
+	
+	compareFamily.
+	Fixed bug in processing hints: it would miss fractional hints, and so
+	falsely report a glyph as having no hints.
+	Fixed so that it would survive a CFF font with a missing Full Name key.
+	
+
+	checkOutlinesUFO
+	Coordinates are written as integers, as well as being rounded.
+	Changed save function so that only the processed glyph layer is saved, and
+	the default layer is not touched.
+	Changed so that XML type is written as 'UTF-8' rather than 'utf-8'. This was
+	actually a change in the FontTools xmlWriter.py module.
+	Fixed typos in usage and help text.
+	Fixed hash dictionary handling so that it will work with autohint, when
+	skipping already processed glyphs.
+	Fixed false report of overlap removal when only change was removing flat curve
+	Fixed stack dump when new glyph is seen which is not in hash map of
+	previously processed glyphs.
+	Added logic to make a reasonable effort to sort the new glyph contours in
+	the same order as the source glyph contours, so the final contour order will
+	not depend on (x,y) position. This was needed because the pyClipper library
+	(which is used to remove overlaps) otherwise sorts the contours in (x,y)
+	position order, which can result in different contour order in different
+	instance fonts from the same set of master fonts.
+	
+	makeInstancesUFO.
+	Changed so that the option -i (selection of  which instances to build) actually works.
+	Removed dependence on existence of instance.txt file.
+	Changed to call checkOutlinesUFO rather than checkOutlines
+	Removed hack of converting all file paths to absolute file paths: this was a
+	work-around for a bug in robofab-ufo3k that is now fixed.
+	Removed all references to old instances.txt meta data file.
+	Fixed so that current dir does not have to be the parent dir of the design space file.
+	
+	Misc
+	Merged fixes from the Github AFDKO OpenSource depot.
+	Updated to latest modules for defcon, fontMath, robofab, and mutatorMath.
+	Fix for Yosemite (Mac OSX 10.10) in FDK/Tools/setFDKPaths. When an FDK script 
+	is run from another Python interpreter, such as the one in Robofont, the parent
+	Python interpreter may set the Unix environment variables PYTHONHOME and
+	PYTHONPATH. This can cause the AFDKO Python interpreter to load some modules
+	from its own library, and others from the parent interpreters library. If these
+	are incompatible, a crash ensues.  The fix is to unset the variables PYTHONHOME
+	and PYTHONPATH before the AFDKO interpreter is called. 
+	Note: AS a separate issue, under Mac OSX 10.10, Python calls to FDK commands
+	will  only  work  if  the calling app is run from the command-line (e.g:
+	“open /Applications/RoboFont.app“), and the argument "shell="True" is added
+	to the subprocess module call to open a system command. I favor also adding
+	the argument "stderr=subprocess.STDOUT", else you will not see error
+	messages from the Unix shell. Example:
+	"log = subprocess.check_output("makeotf -u" , stderr=subprocess.STDOUT , shell=True)".
+
+FDK v2.5 Dec 02 2014 change number 63408.
+
+	spot.
+	Fixed error message in GSUB chain contextual 3 proof file output. spot was
+	adding it as a shell comment to the proof output, cuasing conversion to PDF
+	to fail.
+
+	makeotf.
+	Increase limit for glyph name length from 31 to 63 characters. This is not
+	encouraged in shipping fonts, as there may be text engines that will not
+	accept glyphs with more than 31 characters. This was done to allow building
+	test fonts to look for such cases.
+	
 FDK v2.5 Sep 18 2014 change number 63209.
 
 	makeInstancesUFO.

@@ -8,12 +8,16 @@ This software is licensed as OpenSource, under the Apache License, Version 2.0. 
 #include "absfont.h"
 #include "dictops.h"
 #include "txops.h"
+#include "ctutil.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
 #include <ctype.h>
 #include <math.h>
+#include <limits.h>
+#include <float.h>
 
 #define ARRAY_LEN(a) 	(sizeof(a)/sizeof((a)[0]))
 #define DUMP_LANG_GROUP	(1<<0)
@@ -417,7 +421,7 @@ static void CTL_CDECL dumpInstr(abfGlyphCallbacks *cb, char *fmt, ...)
 	case 2: case 5:
 		{
 		int length;
-		char buf[80];
+		char buf[128];
 		vsprintf(buf, fmt, ap);
 		length = strlen(buf);
 		if (length > h->left)
@@ -427,7 +431,7 @@ static void CTL_CDECL dumpInstr(abfGlyphCallbacks *cb, char *fmt, ...)
 			for (p = &buf[h->left]; *p != ' '; p--)
 				;
 			fprintf(h->fp, "%.*s\n", p - buf, buf);
-			fprintf(h->fp, " %s", p);
+			fprintf(h->fp, "%s", p);
 			h->left = 79 - (strlen(p) + 1);
 			}
 		else
@@ -451,19 +455,55 @@ static void CTL_CDECL dumpInstr(abfGlyphCallbacks *cb, char *fmt, ...)
 /* Dump glyph width. */
 static void glyphWidth(abfGlyphCallbacks *cb, float hAdv)
 	{
-	dumpInstr(cb, " %g width", hAdv);
+	dumpInstr(cb, " %g width", roundf(hAdv));
 	}
+
+/* Write real number in ASCII to dst stream. */
+#define TX_EPSILON 0.0003
+/*In Xcode, FLT_EPSILON is 1.192..x10-7, but the diff between value-roundf(value) can be 3.05x10-5, when the input value is an integer. */
+static void writeReal(char* buf, float value)
+{
+	char tmp[50];
+    int l;
+    
+	/* if no decimal component, perform a faster to string conversion */
+	if ((fabs(value-roundf(value)) < TX_EPSILON) && (value>LONG_MIN) && (value<LONG_MAX))
+        sprintf(tmp, " %ld", (long int)roundf(value));
+	else
+	{
+        float value2 = roundf(value*100)/100; // to avoid getting -0 from 0.0004.
+        if ((value2 == 0) && (value < 0))
+            value2 = 0;
+        sprintf(tmp, " %.2f", value2);
+        l = strlen(tmp)-1;
+        if ((tmp[l] == '0') && (tmp[l-1] == '0'))
+        {
+            tmp[l-2] = 0;
+        }
+     }
+    strcat(buf, tmp);
+}
 
 /* Dump glyph move. */
 static void glyphMove(abfGlyphCallbacks *cb, float x0, float y0)
 	{
-	dumpInstr(cb, " %g %g move", x0, y0);
+    char buf[128];
+    buf[0] = 0;
+    writeReal(buf, x0);
+    writeReal(buf, y0);
+    strcat(buf, " move");
+    dumpInstr(cb, "%s", buf);
 	}
 
 /* Dump glyph line. */
 static void glyphLine(abfGlyphCallbacks *cb, float x1, float y1)
 	{
-	dumpInstr(cb, " %g %g line", x1, y1);
+    char buf[128];
+    buf[0] = 0;
+    writeReal(buf, x1);
+    writeReal(buf, y1);
+    strcat(buf, " line");
+    dumpInstr(cb, "%s", buf);
 	}
 
 /* Dump glyph curve. */
@@ -472,36 +512,73 @@ static void glyphCurve(abfGlyphCallbacks *cb,
 						   float x2, float y2, 
 						   float x3, float y3)
 	{
-	dumpInstr(cb, " %g %g %g %g %g %g curve", x1, y1, x2, y2, x3, y3);
-	}
+    char buf[128];
+    buf[0] = 0;
+    writeReal(buf, x1);
+    writeReal(buf, y1);
+    writeReal(buf, x2);
+    writeReal(buf, y2);
+    writeReal(buf, x3);
+    writeReal(buf, y3);
+    strcat(buf, " curve");
+    dumpInstr(cb, "%s", buf);
+}
 
 /* Dump glyph stem. */
 static void glyphStem(abfGlyphCallbacks *cb, 
 					  int flags, float edge0, float edge1)
 	{
+    char buf[128];
+    buf[0] = 0;
+        
 	if (flags & ABF_NEW_HINTS)
 		dumpInstr(cb, " newhints");
 	if (flags & ABF_NEW_GROUP)
 		dumpInstr(cb, " newgroup");
 	if (flags & ABF_CNTR_STEM)
-		dumpInstr(cb, " %g %g %s", 
-				  edge0, edge1, (flags & ABF_VERT_STEM)? "vcntr": "hcntr");
+	{
+        writeReal(buf, edge0);
+        writeReal(buf, edge1);
+        strcat(buf, (flags & ABF_VERT_STEM)? " vcntr": " hcntr");
+       // dumpInstr(cb, " %.3f %.3f %s",
+		//		  edge0, edge1, (flags & ABF_VERT_STEM)? "vcntr": "hcntr");
+    }
 	else if (flags & ABF_STEM3_STEM)
-		dumpInstr(cb, " %g %g %s", 
-				  edge0, edge1, (flags & ABF_VERT_STEM)? "vstem3": "hstem3");
+	{
+        writeReal(buf, edge0);
+        writeReal(buf, edge1);
+        strcat(buf, (flags & ABF_VERT_STEM)? " vstem3": " hstem3");
+		//dumpInstr(cb, " %.3f %.3f %s",
+		//		  edge0, edge1, (flags & ABF_VERT_STEM)? "vstem3": "hstem3");
+    }
 	else
 		{
 		float width = RND(edge1 - edge0);
 		if (width == ABF_EDGE_HINT_LO)
-			dumpInstr(cb, " %g %s", edge1, 
-					  (flags & ABF_VERT_STEM)? "leftedge": "bottomedge");
-		else if (width == ABF_EDGE_HINT_HI)
-			dumpInstr(cb, " %g %s", edge0, 
-					  (flags & ABF_VERT_STEM)? "rightedge": "topedge");
-		else
-			dumpInstr(cb, " %g %g %s", edge0, edge1, 
-					  (flags & ABF_VERT_STEM)? "vstem": "hstem");
+		{
+            writeReal(buf, edge1);
+            strcat(buf, (flags & ABF_VERT_STEM)? " leftedge": " bottomedge");
+            //dumpInstr(cb, " %.3f %s", edge1,
+			//		  (flags & ABF_VERT_STEM)? "leftedge": "bottomedge");
 		}
+        else if (width == ABF_EDGE_HINT_HI)
+		{
+            writeReal(buf, edge0);
+            strcat(buf, (flags & ABF_VERT_STEM)? " rightedge": " topedge");
+            // dumpInstr(cb, " %.3f %s", edge0,
+			//		  (flags & ABF_VERT_STEM)? "rightedge": "topedge");
+        }
+		else
+		{
+            writeReal(buf, edge0);
+            writeReal(buf, edge1);
+            strcat(buf, (flags & ABF_VERT_STEM)? " vstem": " hstem");
+            //dumpInstr(cb, " %.3f %.3f %s", edge0, edge1,
+			//		  (flags & ABF_VERT_STEM)? "vstem": "hstem");
+
+        }		}
+    dumpInstr(cb, "%s", buf);
+        
 	}
 
 /* Dump glyph flex. */
@@ -513,8 +590,30 @@ static void glyphFlex(abfGlyphCallbacks *cb, float depth,
 					  float x5, float y5, 
 					  float x6, float y6)
 	{
-	dumpInstr(cb, " %g %g %g %g %g %g %g %g %g %g %g %g %g flex",
-		   x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, x6, y6, depth);
+        char buf[128];
+        buf[0] = 0;
+
+        
+        writeReal(buf, x1);
+        writeReal(buf, y1);
+        writeReal(buf, x2);
+        writeReal(buf, y2);
+        writeReal(buf, x3);
+        writeReal(buf, y3);
+        dumpInstr(cb, "%s", buf);
+        buf[0] = 0;
+        writeReal(buf, x4);
+        writeReal(buf, y4);
+        writeReal(buf, x5);
+        writeReal(buf, y5);
+        writeReal(buf, x6);
+        writeReal(buf, y6);
+        writeReal(buf, depth);
+        strcat(buf, " flex");
+        dumpInstr(cb, "%s", buf);
+
+        //dumpInstr(cb, " %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f %.3f flex",
+		//   x1, y1, x2, y2, x3, y3, x4, y4, x5, y5, x6, y6, depth);
 	}
 
 /* Dump glyph general operator. */

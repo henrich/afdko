@@ -1,6 +1,11 @@
 /* Copyright 2014 Adobe Systems Incorporated (http://www.adobe.com/). All Rights Reserved.
 This software is licensed as OpenSource, under the Apache License, Version 2.0. This license is available at: http://opensource.org/licenses/Apache-2.0. */
 
+
+/* See the discussion in the function definition for:
+ control.c:Blues() 
+ private procedure Blues() 
+ */
 #include "ac_C_lib.h"
 #include "buildfont.h"
 
@@ -225,6 +230,7 @@ extern boolean writecoloredbez;
 extern Fixed bluefuzz;
 extern boolean doAligns, doStems;
 extern boolean idInFile;
+extern boolean roundToInt;
 extern char bezGlyphName[64]; /* defined in read.c; set from the glyph name at the start of the bex file. */
 
 /* macros */
@@ -234,11 +240,13 @@ extern char bezGlyphName[64]; /* defined in read.c; set from the glyph name at t
 #define FixedPosInf MAXinteger
 #define FixedNegInf MINinteger
 #define FixShift (8)
-#define FixInt(i) ((long int)(i) << FixShift)
-#define FRnd(x) ((long int)(((x)+(1<<7)) & ~0xFFL))
-#define FHalfRnd(x) ((long int)(((x)+(1<<6)) & ~0x7FL))
-#define FracPart(x) ((x) & 0xFFL)
-#define FTrunc(x) ((long int)((x)>>8))
+#define FixInt(i) (((long int)(i)) << FixShift)
+#define FixReal(i) ((long int)((i) *256.0))
+extern long int FRnd(long int x);
+#define FHalfRnd(x) ((long int)(((x)+(1<<7)) & ~0xFFL))
+#define FracPart(x) ((long int)(x) & 0xFFL)
+#define FTrunc(x) (((long int)(x))>>FixShift)
+#define FIXED2FLOAT(x) (x/256.0)
 #if SUN
 #ifndef MAX
 #define MAX(a,b) ((a) >= (b)? (a) : (b))
@@ -248,27 +256,21 @@ extern char bezGlyphName[64]; /* defined in read.c; set from the glyph name at t
 #endif
 #endif
 
-#if 0
-#define X0 (FixInt(200))
-#define Y0 (FixInt(473))
-#else
-#define X0 (0L)
-#define Y0 (0L)
-#endif
 #define FixOne (0x100L)
+#define FixTwo (0x200L)
 #define FixHalf (0x80L)
 #define FixQuarter (0x40L)
-#define FixHalfMul(f) ((f) >> 1)
+#define FixHalfMul(f) (2*((f) >> 2)) /* DEBUG 8 BIT. Revert this to ((f) >>1) once I am confident that there are not bugs from the update to 8 bits for the Fixed fraction. */
 #define FixTwoMul(f) ((f) << 1)
-#define tfmx(x) (FixHalfMul(x) + X0)
-#define tfmy(y) (-FixHalfMul(y) + Y0)
-#define itfmx(x) (FixTwoMul((x) - X0))
-#define itfmy(y) (-FixTwoMul((y) - Y0))
-#define dtfmx(x) (FixHalfMul(x))
-#define dtfmy(y) (-FixHalfMul(y))
-#define idtfmx(x) (FixTwoMul(x))
-#define idtfmy(y) (-FixTwoMul(y))
-#define PSDist(d) (dtfmx(FixInt(d)))
+#define tfmx(x) ((x))
+#define tfmy(y) (-(y))
+#define itfmx(x) ((x))
+#define itfmy(y) (-(y))
+#define dtfmx(x) ((x))
+#define dtfmy(y) (-(y))
+#define idtfmx(x) ((x))
+#define idtfmy(y) (-(y))
+#define PSDist(d) ((FixInt(d)))
 #define IsVertical(x1,y1,x2,y2) (VertQuo(x1,y1,x2,y2) > 0)
 #define IsHorizontal(x1,y1,x2,y2) (HorzQuo(x1,y1,x2,y2) > 0)
 #define SFACTOR (20L)
@@ -277,6 +279,10 @@ extern char bezGlyphName[64]; /* defined in read.c; set from the glyph name at t
 #define ProdLt0(f0, f1) (((f0) < 0L && (f1) > 0L) || ((f0) > 0L && (f1) < 0L))
 #define ProdGe0(f0, f1) (!ProdLt0(f0, f1))
 
+#define DEBUG_ROUND(val) { val = ( val >=0 ) ? (2*(val/2)) : (2*((val - 1)/2));}
+#define DEBUG_ROUND4(val) { val = ( val >=0 ) ? (4*(val/4)) : (4*((val - 1)/4));}
+
+/* DEBUG_ROUND is used to force calculations to come out the same as the previous version, where coordinates used 7 bits for the Fixed fraction, rather than the current 8 bits. Once I am confident that there are no bugs in the update, I will remove all occurences of this macro, and accept the differences due to more exact division */
 /* procedures */
 
 /* The fix to float and float to fixed procs are different for ac because it
@@ -333,12 +339,12 @@ extern boolean CheckBBoxes(/*e1, e2*/);
 extern boolean CheckSmoothness(/*x0, y0, x1, y1, x2, y2, pd*/);
 extern procedure CheckForDups();
 extern boolean showClrInfo;
-extern procedure AddColorPoint(/*x0, y0, x1, y1, ch, p0, p1*/);
-extern procedure AddHPair(/*v, ch*/);
-extern procedure AddVPair(/*v, ch*/);
+extern procedure AddColorPoint(Fixed x0, Fixed y0, Fixed x1, Fixed y1, char ch, PPathElt p0, PPathElt p1);
+extern procedure AddHPair(PClrVal v, char ch);
+extern procedure AddVPair(PClrVal v, char ch);
 extern procedure XtraClrs(/*e*/);
 extern boolean CreateTimesFile();
-extern boolean DoFile(/*fname, extracolor*/);
+extern boolean DoFile(char *fname, boolean extracolor);
 extern procedure DoList(/*filenames*/);
 extern procedure EvalV();
 extern procedure EvalH();
@@ -375,7 +381,7 @@ extern procedure DoPrune();
 extern procedure PruneVVals();
 extern procedure PruneHVals();
 extern procedure MergeVals(/*vert*/);
-extern procedure MergeFromMainColors(/*ch*/);
+extern procedure MergeFromMainColors(char ch);
 extern procedure RoundPathCoords();
 extern procedure MoveSubpathToEnd(/*e*/);
 extern procedure AddSolEol();

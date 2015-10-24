@@ -115,7 +115,7 @@ private procedure RemLnk(e,hFlg,rm)
   LogMsg(globmsg, LOGERROR, NONFATALERROR, TRUE);
   }
 
-private boolean AlreadyOnList(v, lst) register PClrVal v, lst; {
+private boolean AlreadyOnList(v, lst)  register PClrVal v, lst; {
   while (lst != NULL) {
     if (v == lst) return TRUE;
     lst = lst->vNxt;
@@ -668,7 +668,8 @@ private procedure CarryIfNeed(loc,vert,clrs)
   Fixed l0, l1, tmp, halfMargin;
   if ((vert && useV) || (!vert && useH)) return;
   halfMargin = FixHalfMul(bandMargin);
-  if (halfMargin > FixInt(10)) halfMargin = FixInt(10);
+  /* DEBUG 8 BIT. Needed to double test from 10 to 20 for change in coordinate system */
+  if (halfMargin > FixInt(20)) halfMargin = FixInt(20);
   while (clrs != NULL) {
     seg = clrs->vSeg1;
     if (clrs->vGhst && seg->sType == sGHOST) seg = clrs->vSeg2;
@@ -680,13 +681,15 @@ private procedure CarryIfNeed(loc,vert,clrs)
       seglnk = seg->sLnk; seg->sLnk = clrs;
       if (vert) {
         if (TestColor(seg,Vcoloring,TRUE,TRUE) == 1) {
-          if (showClrInfo) ReportCarry(l0, l1, loc, clrs, vert);
+          if (showClrInfo)
+              ReportCarry(l0, l1, loc, clrs, vert);
           AddVColoring(clrs);
 	  seg->sLnk = seglnk;
 	  break; }
         }
       else if (TestColor(seg,Hcoloring,YgoesUp,TRUE) == 1) {
-        if (showClrInfo) ReportCarry(l0, l1, loc, clrs, vert);
+        if (showClrInfo)
+            ReportCarry(l0, l1, loc, clrs, vert);
         AddHColoring(clrs);
 	seg->sLnk = seglnk;
 	break; }
@@ -696,7 +699,7 @@ private procedure CarryIfNeed(loc,vert,clrs)
     }
   }
 
-#define PRODIST (FixInt(50))
+#define PRODIST (FixInt(100)) /* DEBUG 8 BIT. Needed to double test from 50 to 100 for change in coordinate system */
 private procedure ProClrs(e,hFlg,loc)
   PPathElt e; Fixed loc; boolean hFlg; {
   PSegLnkLst lst, plst;
@@ -758,90 +761,93 @@ private procedure RemShortColors() {
   }
 
 public procedure AutoExtraColors(movetoNewClrs, soleol, solWhere)
-  boolean movetoNewClrs, soleol; integer solWhere; {
-  integer h, v, ph, pv;
-  PPathElt e, cp, p;
-  integer etype;
-  PSegLnkLst hLst, vLst, phLst, pvLst;
-  PClrVal mtVclrs, mtHclrs, prvHclrs, prvVclrs;
-
-  boolean (*Tst)(), newClrs = TRUE;
-  boolean isSpc;
-  Fixed x, y;
-
-  isSpc = clrBBox = clrVBounds = clrHBounds = FALSE;
-  mergeMain = (CountSubPaths() <= 5);
-  e = pathStart;
-  if (AutoExtraDEBUG) PrintMessage("RemFlares");
-  RemFlares(TRUE); RemFlares(FALSE);
-  if (AutoExtraDEBUG) PrintMessage("CheckElmntClrSegs");
-  CheckElmntClrSegs();
-  if (AutoExtraDEBUG) PrintMessage("PromoteColors");
-  PromoteColors();
-  if (AutoExtraDEBUG) PrintMessage("RemShortColors");
-  RemShortColors();
-  haveVBnds = clrVBounds;
-  haveHBnds = clrHBounds;
-  p = NULL;
-  Tst = IsOk; /* it is ok to add to primary coloring */
-  if (AutoExtraDEBUG) PrintMessage("color loop");
-  mtVclrs = mtHclrs = NULL;
-  while (e != NULL) {
-    etype = e->type;
-    if (movetoNewClrs && etype == MOVETO) { 
-      StartNewColoring(e, (PSegLnkLst)NULL, (PSegLnkLst)NULL); Tst = IsOk; }
-    if (soleol && etype == MOVETO) { /* start new coloring on soleol mt */
-      if ((solWhere == 1 && IsUpper(e)) ||
-          (solWhere == -1 && IsLower(e)) ||
-           (solWhere == 0)) { /* color bbox of next subpath */
+boolean movetoNewClrs, soleol; integer solWhere; {
+    integer h, v, ph, pv;
+    PPathElt e, cp, p;
+    integer etype;
+    PSegLnkLst hLst, vLst, phLst, pvLst;
+    PClrVal mtVclrs, mtHclrs, prvHclrs, prvVclrs;
+    
+    boolean (*Tst)(), newClrs = TRUE;
+    boolean isSpc;
+    Fixed x, y;
+    
+    isSpc = clrBBox = clrVBounds = clrHBounds = FALSE;
+    mergeMain = (CountSubPaths() <= 5);
+    e = pathStart;
+    if (AutoExtraDEBUG) PrintMessage("RemFlares");
+    RemFlares(TRUE); RemFlares(FALSE);
+    if (AutoExtraDEBUG) PrintMessage("CheckElmntClrSegs");
+    CheckElmntClrSegs();
+    if (AutoExtraDEBUG) PrintMessage("PromoteColors");
+    PromoteColors();
+    if (AutoExtraDEBUG) PrintMessage("RemShortColors");
+    RemShortColors();
+    haveVBnds = clrVBounds;
+    haveHBnds = clrHBounds;
+    p = NULL;
+    Tst = IsOk; /* it is ok to add to primary coloring */
+    if (AutoExtraDEBUG) PrintMessage("color loop");
+    mtVclrs = mtHclrs = NULL;
+    while (e != NULL) {
+        etype = e->type;
+        if (movetoNewClrs && etype == MOVETO) {
+            StartNewColoring(e, (PSegLnkLst)NULL, (PSegLnkLst)NULL); Tst = IsOk; }
+        if (soleol && etype == MOVETO) { /* start new coloring on soleol mt */
+            if ((solWhere == 1 && IsUpper(e)) ||
+                (solWhere == -1 && IsLower(e)) ||
+                (solWhere == 0)) { /* color bbox of next subpath */
+                StartNewColoring(e, (PSegLnkLst)NULL, (PSegLnkLst)NULL);
+                Tst = IsOk; haveHBnds = haveVBnds = isSpc = TRUE;
+                e = ColorBBox(e); continue; }
+            else if (isSpc) { /* new coloring after the special */
+                StartNewColoring(e, (PSegLnkLst)NULL, (PSegLnkLst)NULL);
+                Tst = IsOk; haveHBnds = haveVBnds = isSpc = FALSE; }
+        }
+        if (newClrs && e == p) {
             StartNewColoring(e, (PSegLnkLst)NULL, (PSegLnkLst)NULL);
-	    Tst = IsOk; haveHBnds = haveVBnds = isSpc = TRUE;
-            e = ColorBBox(e); continue; }
-      else if (isSpc) { /* new coloring after the special */
-        StartNewColoring(e, (PSegLnkLst)NULL, (PSegLnkLst)NULL);
-	Tst = IsOk; haveHBnds = haveVBnds = isSpc = FALSE; }
-      }
-    if (newClrs && e == p) {
-      StartNewColoring(e, (PSegLnkLst)NULL, (PSegLnkLst)NULL);
-      SetHColors(mtHclrs); SetVColors(mtVclrs);
-      Tst = IsIn;
-      }
-    GetColorLsts(e, &hLst, &vLst, &h, &v);
-    if (etype == MOVETO && IsShort(cp = GetClosedBy(e))) {
-      GetColorLsts(p = cp->prev, &phLst, &pvLst, &ph, &pv);
-      if (ClrsClash(e, p, &hLst, &vLst, &phLst, &pvLst)) {
+            SetHColors(mtHclrs); SetVColors(mtVclrs);
+            Tst = IsIn;
+        }
         GetColorLsts(e, &hLst, &vLst, &h, &v);
-	GetColorLsts(p, &phLst, &pvLst, &ph, &pv);
+        if (etype == MOVETO && IsShort(cp = GetClosedBy(e))) {
+            GetColorLsts(p = cp->prev, &phLst, &pvLst, &ph, &pv);
+            if (ClrsClash(e, p, &hLst, &vLst, &phLst, &pvLst)) {
+                GetColorLsts(e, &hLst, &vLst, &h, &v);
+                GetColorLsts(p, &phLst, &pvLst, &ph, &pv);
+            }
+            if (!(*Tst)(ph,pv) || !(*Tst)(h,v)) {
+                StartNewColoring(e, hLst, vLst); Tst = IsOk;
+                ph = pv = 1; /* force add of colors for p also */
+            }
+            else { AddIfNeedH(h,hLst); AddIfNeedV(v,vLst); }
+            AddIfNeedH(ph,phLst); AddIfNeedV(pv,pvLst);
+            newClrs = FALSE; /* so can tell if added new colors in subpath */
         }
-      if (!(*Tst)(ph,pv) || !(*Tst)(h,v)) {
-        StartNewColoring(e, hLst, vLst); Tst = IsOk;
-        ph = pv = 1; /* force add of colors for p also */
+        else if (!(*Tst)(h,v)) { /* e needs new coloring */
+            if (etype == CLOSEPATH) { /* do not attach extra colors to closepath */
+                e = e->prev; GetColorLsts(e, &hLst, &vLst, &h, &v); }
+            prvHclrs = CopyClrs(Hcoloring);
+            prvVclrs = CopyClrs(Vcoloring);
+            if (!newClrs) { /* this is the first extra since mt */
+                newClrs = TRUE;
+                mtVclrs = CopyClrs(prvVclrs);
+                mtHclrs = CopyClrs(prvHclrs); }
+            StartNewColoring(e, hLst, vLst);
+            Tst = IsOk;
+            if (etype == CURVETO) { x = e->x1; y = e->y1; }
+            else GetEndPoint(e, &x, &y);
+            CarryIfNeed(y,FALSE,prvHclrs);
+            CarryIfNeed(x,TRUE,prvVclrs);
         }
-      else { AddIfNeedH(h,hLst); AddIfNeedV(v,vLst); }
-      AddIfNeedH(ph,phLst); AddIfNeedV(pv,pvLst);
-      newClrs = FALSE; /* so can tell if added new colors in subpath */
-      }
-    else if (!(*Tst)(h,v)) { /* e needs new coloring */
-      if (etype == CLOSEPATH) { /* do not attach extra colors to closepath */
-        e = e->prev; GetColorLsts(e, &hLst, &vLst, &h, &v); }
-      prvHclrs = CopyClrs(Hcoloring);
-      prvVclrs = CopyClrs(Vcoloring);
-      if (!newClrs) { /* this is the first extra since mt */
-        newClrs = TRUE;
-	mtVclrs = CopyClrs(prvVclrs);
-	mtHclrs = CopyClrs(prvHclrs); }
-      StartNewColoring(e, hLst, vLst); Tst = IsOk;
-      if (etype == CURVETO) { x = e->x1; y = e->y1; }
-      else GetEndPoint(e, &x, &y);
-      CarryIfNeed(y,FALSE,prvHclrs);
-      CarryIfNeed(x,TRUE,prvVclrs);
-      }
-    else { /* do not need to start new coloring */
-      AddIfNeedH(h,hLst); AddIfNeedV(v,vLst); }
-    e = e->next; }
-  ReClrBounds(pathEnd);
-  if (AutoExtraDEBUG) PrintMessage("RemPromotedClrs");
-  RemPromotedClrs();
-  if (AutoExtraDEBUG) PrintMessage("done autoextracolors");
-  }
+        else { /* do not need to start new coloring */
+            AddIfNeedH(h,hLst);
+            AddIfNeedV(v,vLst);
+        }
+        e = e->next; }
+    ReClrBounds(pathEnd);
+    if (AutoExtraDEBUG) PrintMessage("RemPromotedClrs");
+    RemPromotedClrs();
+    if (AutoExtraDEBUG) PrintMessage("done autoextracolors");
+}
 
