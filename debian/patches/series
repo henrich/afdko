@@ -1,2 +1,3 @@
 python_path.patch
 remove-m32.patch
+0003-adjust-FDKScripts-path-for-debian-package.patch

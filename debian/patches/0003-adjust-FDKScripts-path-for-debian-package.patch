@@ -1,0 +1,21 @@
+From: Hideki Yamane <henrich@debian.org>
+Date: Sat, 24 Oct 2015 17:15:45 +0900
+Subject: adjust FDKScripts path for debian package
+
+---
+ FDK/Tools/linux/setFDKPaths | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/FDK/Tools/linux/setFDKPaths b/FDK/Tools/linux/setFDKPaths
+index 2cdefc5..dd61655 100755
+--- a/FDK/Tools/linux/setFDKPaths
++++ b/FDK/Tools/linux/setFDKPaths
+@@ -3,7 +3,7 @@ AFDKO_EXE_PATH="${cmdDirPath}"
+ 
+ AFDKO_Python=/usr/bin/python2.7
+ 
+-AFDKO_Scripts="${AFDKO_EXE_PATH}"/../SharedData/FDKScripts
++AFDKO_Scripts=/usr/share/afdko/FDKScripts
+ 
+ export AFDKO_EXE_PATH
+ export AFDKO_Python
